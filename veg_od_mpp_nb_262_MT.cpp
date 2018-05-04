@@ -554,7 +554,7 @@ namespace veg_pp {
       
       for(int nt = 0; nt < N_township;++nt) {
         for (int k = 0; k < K; ++k) {
-          for(int i = 1; i<N; ++i) {
+          for(int i = 0; i<N; ++i) {
             r_township(nt,k) = r_township(nt,k) + TS_matrix(i,nt) * r(i,k]);
           }
         } 
