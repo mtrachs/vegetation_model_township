@@ -44,13 +44,13 @@ transformed data {
 
 parameters {
   //vector<lower=0, upper=50>[W] eta;  
-  vector<lower=0.1, upper=sqrt(100)>[W] eta;//strength of spatial correlation
+  vector<lower=0.1, upper=sqrt(100)>[K] eta;//strength of spatial correlation
   //vector<lower=0.1>[W] sigma;  
-  vector<lower=1.0e-6, upper=1.0>[W] rho; // spatial decorrelation length this code has a baseline taxon 
+  vector<lower=1.0e-6, upper=1.0>[K] rho; // spatial decorrelation length this code has a baseline taxon 
 
-  vector[W] mu;//mean value of the gaussian process  
-  vector[N_knots] alpha[W]; // term of the modified predictive porcess
-  vector[N] g[W]; // gaussian process
+  vector[K] mu;//mean value of the gaussian process  
+  vector[N_knots] alpha[K]; // term of the modified predictive porcess
+  vector[N] g[K]; // gaussian process
 }
 
 
@@ -63,9 +63,9 @@ transformed parameters {
 
 model {
   //declarations
-  matrix[N_knots,N_knots] C_star[W];
-  matrix[N_knots,N_knots] C_star_L[W];
-  matrix[N_knots,N_knots] C_star_inv[W];
+  matrix[N_knots,N_knots] C_star[K];
+  matrix[N_knots,N_knots] C_star_L[K];
+  matrix[N_knots,N_knots] C_star_inv[K];
   
   print("eta = ", eta);
 
@@ -75,7 +75,7 @@ model {
   mu       ~ normal(0,5);//mean of the spatial process
   
   // construct knots covariance matrix C*
-  for (k in 1:W){
+  for (k in 1:K){
     for (i in 1:N_knots)
       for (j in i:N_knots)
         C_star[k,i,j] <- pow(eta[k],2) * exp(-1/rho[k] * d_knots[i,j]);
@@ -94,7 +94,7 @@ model {
   } // end k loop 
  
   { 
-  matrix[N,N_knots] c[W];
+  matrix[N,N_knots] c[K];
   //vector[N] g[W];
   vector[N] sum_exp_g; // sum of the exponential of the gaussian process
   vector[K] r[N]; //proportion
@@ -106,7 +106,7 @@ model {
   
   vector[N] mu_2;   
 
-  for (k in 1:W){	    
+  for (k in 1:K){	    
     for (i in 1:N){
       for (j in 1:N_knots){
         c[k][i,j] <- pow(eta[k],2) * exp(-1/rho[k] * d_inter[i,j]);   //matrix of covariances between knots and initial locations
@@ -114,7 +114,7 @@ model {
     }
   }
   
-  for (k in 1:W){
+  for (k in 1:K){
       
     mu_2 <- M * (c[k] * (C_star_inv[k] * alpha[k]));
 // term in brackets is time invariant term of prediction model, 
@@ -138,20 +138,18 @@ model {
   // sum process vals for each i
   for (i in 1:N) {
     sum_exp_g[i] <- 0.0;
-    for (k in 1:W)
+    for (k in 1:K)
       sum_exp_g[i] <- sum_exp_g[i] + exp(g[k,i]);
   }
 
   // additive log-ratio transformation
-  for (k in 1:W)
+  for (k in 1:K)
     for (i in 1:N)
-      r[i,k] <- exp(g[k,i]) / (1 + sum_exp_g[i]);
-  for (i in 1:N)
-      r[i,K] <- 1 / (1 + sum_exp_g[i]);
+      r[i,k] <- exp(g[k,i]) / sum_exp_g[i];
 
 // we will have to aggregate vegetation from all grid points to township level first. 
 // 
-// for (nt in 1:N_township) {
+for (nt in 1:N_township) {
   for(k in 1:K) {    
     r_township[nt,k] <- 0.0;
     //r_township1[1] <- 0.0;
