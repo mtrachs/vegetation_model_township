@@ -40,7 +40,7 @@ namespace veg_pp {
     int K;
     int N;
     int N_knots;
-    int N_townships;
+    int N_township;
     vector< vector<int> > y;
     matrix_d d_knots;
     matrix_d d_inter;
@@ -89,15 +89,15 @@ namespace veg_pp {
       pos__ = 0;
       N_township = vals_i__[pos__++];
 
-      context__.validate_dims("data initialization", "y", "int", context__.to_vec(N,K));
-      stan::math::validate_non_negative_index("y", "N", N);
+      context__.validate_dims("data initialization", "y", "int", context__.to_vec(N_township,K));
+      stan::math::validate_non_negative_index("y", "N_township", N_township);
       stan::math::validate_non_negative_index("y", "K", K);
-      y = std::vector<std::vector<int> >(N,std::vector<int>(K,int(0)));
+      y = std::vector<std::vector<int> >(N_township,std::vector<int>(K,int(0)));
       vals_i__ = context__.vals_i("y");
       pos__ = 0;
       size_t y_limit_1__ = K;
       for (size_t i_1__ = 0; i_1__ < y_limit_1__; ++i_1__) {
-	size_t y_limit_0__ = N;
+	size_t y_limit_0__ = N_township;
 	for (size_t i_0__ = 0; i_0__ < y_limit_0__; ++i_0__) {
 	  y[i_0__][i_1__] = vals_i__[pos__++];
 	}
@@ -131,14 +131,14 @@ namespace veg_pp {
 	}
       }
       
-      context__.validate_dims("data initialization", "TS_matrix", "matrix_d", context__.to_vec(N,N_knots));
+      context__.validate_dims("data initialization", "TS_matrix", "matrix_d", context__.to_vec(N,N_township));
       stan::math::validate_non_negative_index("TS_matrix", "N", N);
-      stan::math::validate_non_negative_index("TS_matrix", "N_townships", N_townships);
-      TS_matrix = matrix_d(N,N_townships);
+      stan::math::validate_non_negative_index("TS_matrix", "N_township", N_township);
+      TS_matrix = matrix_d(N,N_township);
       vals_r__ = context__.vals_r("TS_matrix");
       pos__ = 0;
-      size_t d_inter_m_mat_lim__ = N;
-      size_t d_inter_n_mat_lim__ = N_townships;
+      size_t TS_matrix_m_mat_lim__ = N;
+      size_t TS_matrix_n_mat_lim__ = N_township;
       for (size_t n_mat__ = 0; n_mat__ < TS_matrix_n_mat_lim__; ++n_mat__) {
         for (size_t m_mat__ = 0; m_mat__ < TS_matrix_m_mat_lim__; ++m_mat__) {
           TS_matrix(m_mat__,n_mat__) = vals_r__[pos__++];
@@ -487,6 +487,7 @@ namespace veg_pp {
 
       matrix_d exp_g(N,K);
       matrix_d r(N,K);
+      matrix_d r_township(N_township,K);
 
       vector<matrix_d> C_inv(K);
       vector<vector_d> mu_g(K);
@@ -551,11 +552,11 @@ namespace veg_pp {
 	}
       }
       
-      
+      #pragma omp parallel for
       for(int nt = 0; nt < N_township;++nt) {
         for (int k = 0; k < K; ++k) {
           for(int i = 1; i<N; ++i) {
-            r_township(nt,k) = r_township(nt,k) + TS_matrix(i,nt) * r(i,k]);
+            r_township(nt,k) = r_township(nt,k) + TS_matrix(i,nt) * r(i,k);
           }
         } 
       }
@@ -670,8 +671,8 @@ namespace veg_pp {
               drdg = exp_g(i,k) * (sumgp1 - exp_g(i,k)) * sumgp1inv2;
             else if (m != k)
               drdg = -exp_g(i,k) * exp_g(i,m) * sumgp1inv2;
-
-	    gradient[3*K+K*N_knots+k*N+i] += y[i][m] / r(i,m) * drdg;
+//problem here: y does now have dimension N_township X K 
+	    gradient[3*K+K*N_knots+k*N+i] += y[i][m] / r_township(i,m) * drdg;
           }
         }
       }
