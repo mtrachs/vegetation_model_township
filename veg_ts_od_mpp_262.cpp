@@ -551,7 +551,7 @@ namespace veg_pp {
 	  vector_d c_i = c[k].row(i);
           // XXX: 15%
 	  ci_Cinv_ci[k][i] = (c_i.transpose() * C_inv[k] * c_i)(0);
-	  sigma2[k][i] = eta2 + ci_Cinv_ci[k][i];
+	  sigma2[k][i] = eta2 - ci_Cinv_ci[k][i];
 
 	  lp_thrd[k] += normal_log_double(g[k](i), mu_g[k][i], sqrt(sigma2[k][i]));
 	}
@@ -564,7 +564,7 @@ namespace veg_pp {
       
       vector_d sum_exp_g = exp_g.rowwise().sum();
 
-      #pragma omp parallel for
+      #pragma omp parallel for collapse(2)
       for (int k = 0; k < K; ++k){
         for (int i = 0; i < N; ++i){
           // r(i,k) = exp_g(i,k) / (1. + sum_exp_g(i));
@@ -572,7 +572,7 @@ namespace veg_pp {
 	}
       }
       
-  
+      #pragma omp parallel for collapse(2)
       for (int nt = 0; nt < N_township; ++nt) {
 	for (int k = 0; k < K; ++k) {
 	  r_township(nt,k) = 0.0;
@@ -586,7 +586,7 @@ namespace veg_pp {
         //std::cout << "r_township = " << r_township.row(nt).sum() <<  std::endl;
       }
 
-		
+      //#pragma omp parallel for	
       for (int i = 0; i < N_township; ++i) {
 	if (r_township.row(i).sum() > 0.0)
 	  lp+=multinomial_log_double(y[i], r_township.row(i));
@@ -622,7 +622,7 @@ namespace veg_pp {
       // eta
       gradient[k] += etainv * ( - N_knots + alphaT * Cinv_alpha ) * eta_ja[k] + eta_dj[k];
 
-      // rho
+      // partial of alpha MVN with respect to rho
       gradient[K+k] += 0.5 * (-(llt[k].solve(dCdrho)).trace()
 			      + alphaT_Cinv * dCdrho * Cinv_alpha) * rho_ja[k] + rho_dj[k];
 
@@ -659,7 +659,8 @@ namespace veg_pp {
 	double dssdrho = rs_foo1[i] - rs_foo2[i] + rs_cCinv_dcdrho[i];
 
 	// eta
-	gradient[k] += ((eta[k] + etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
+	//gradient[k] += ((eta[k] + etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
+	gradient[k] += ((eta[k] - etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
 	gradient[2*K+k] += gn;
 
 	// g normal
