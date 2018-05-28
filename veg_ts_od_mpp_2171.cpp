@@ -274,7 +274,7 @@ namespace veg_pp {
       vector_d eta(K);
       for (int j1__ = 0U; j1__ < K; ++j1__)
 	eta(j1__) = vals_r__[pos__++];
-      try { writer__.vector_lub_unconstrain(0.10000000000000001,stan::math::sqrt(100),eta); } catch (const std::exception& e) {  throw std::runtime_error(std::string("Error transforming variable eta: ") + e.what()); }
+      try { writer__.vector_lub_unconstrain(0.10000000000000001,stan::math::sqrt(25),eta); } catch (const std::exception& e) {  throw std::runtime_error(std::string("Error transforming variable eta: ") + e.what()); }
 
       if (!(context__.contains_r("rho")))
 	throw std::runtime_error("variable rho missing");
@@ -284,7 +284,7 @@ namespace veg_pp {
       vector_d rho(K);
       for (int j1__ = 0U; j1__ < K; ++j1__)
 	rho(j1__) = vals_r__[pos__++];
-      try { writer__.vector_lub_unconstrain(9.9999999999999995e-07,1.0,rho); } catch (const std::exception& e) {  throw std::runtime_error(std::string("Error transforming variable rho: ") + e.what()); }
+      try { writer__.vector_lub_unconstrain(9.9999999999999995e-07,0.6,rho); } catch (const std::exception& e) {  throw std::runtime_error(std::string("Error transforming variable rho: ") + e.what()); }
 
       if (!(context__.contains_r("mu")))
 	throw std::runtime_error("variable mu missing");
@@ -464,7 +464,7 @@ namespace veg_pp {
 
       vector_d eta(K), eta_lja(K), eta_ja(K), eta_dj(K);
       for (int i=0; i<K; i++)
-        eta[i] = lub_transform(in.scalar(), 0.1, 10.0, eta_lja[i], eta_ja[i], eta_dj[i]);
+        eta[i] = lub_transform(in.scalar(), 0.1, 5.0, eta_lja[i], eta_ja[i], eta_dj[i]);
 
       if (jacobian)
         for (int i=0; i<K; i++)
@@ -472,7 +472,7 @@ namespace veg_pp {
 
       vector_d rho(K), rho_lja(K), rho_ja(K), rho_dj(K);
       for (int i=0; i<K; i++)
-        rho[i] = lub_transform(in.scalar(), 1.0e-6, 1.0, rho_lja[i], rho_ja[i], rho_dj[i]);
+        rho[i] = lub_transform(in.scalar(), 1.0e-6, 0.6, rho_lja[i], rho_ja[i], rho_dj[i]);
 
       if (jacobian)
         for (int i=0; i<K; i++)
@@ -552,7 +552,7 @@ namespace veg_pp {
 	  vector_d c_i = c[k].row(i);
           // XXX: 15%
 	  ci_Cinv_ci[k][i] = (c_i.transpose() * C_inv[k] * c_i)(0);
-	  sigma2[k][i] = eta2 + ci_Cinv_ci[k][i];
+	  sigma2[k][i] = eta2 - ci_Cinv_ci[k][i];
 
 	  lp_thrd[k] += normal_log_double(g[k](i), mu_g[k][i], sqrt(sigma2[k][i]));
 	}
@@ -587,7 +587,7 @@ namespace veg_pp {
         //std::cout << "r_township = " << r_township.row(nt).sum() <<  std::endl;
       }
 
-      #pragma omp parallel for	
+      //      #pragma omp parallel for	
       for (int i = 0; i < N_township; ++i) {
 	if (r_township.row(i).sum() > 0.0)
 	  lp+=multinomial_log_double(y[i], r_township.row(i));
@@ -622,10 +622,11 @@ namespace veg_pp {
 
       // eta
       gradient[k] += etainv * ( - N_knots + alphaT * Cinv_alpha ) * eta_ja[k] + eta_dj[k];
+      //gradient[k] += - etainv * ( - N_knots + alphaT * Cinv_alpha ) * eta_ja[k] + eta_dj[k];
 
-      // rho
+      // partial of alpha MVN with respect to rho
       gradient[K+k] += 0.5 * (-(llt[k].solve(dCdrho)).trace()
-			      + alphaT_Cinv * dCdrho * Cinv_alpha) * rho_ja[k] + rho_dj[k];
+       			      + alphaT_Cinv * dCdrho * Cinv_alpha) * rho_ja[k] + rho_dj[k];
 
       // mvn wrt alphas
       for (int i=0; i<N_knots; i++)
@@ -657,10 +658,11 @@ namespace veg_pp {
 	double const ss2inv = 1./ss2;
 
 	// XXX
-	double dssdrho = rs_foo1[i] - rs_foo2[i] + rs_cCinv_dcdrho[i];
+	double dssdrho = -(rs_foo1[i] - rs_foo2[i] + rs_cCinv_dcdrho[i]);
 
 	// eta
-	gradient[k] += ((eta[k] + etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
+	//gradient[k] += ((eta[k] + etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
+	gradient[k] += ((eta[k] - etainv * ci_Cinv_ci[k][i]) * gc*gc * ss2inv - etainv) * eta_ja[k];
 	gradient[2*K+k] += gn;
 
 	// g normal
@@ -791,8 +793,8 @@ namespace veg_pp {
       static const char* function__ = "veg_pp::write_array";
       (void) function__; // dummy call to supress warning
       // read-transform, write parameters
-      vector_d eta = in__.vector_lub_constrain(0.10000000000000001,stan::math::sqrt(100),K);
-      vector_d rho = in__.vector_lub_constrain(9.9999999999999995e-07,1.0,K);
+      vector_d eta = in__.vector_lub_constrain(0.10000000000000001,stan::math::sqrt(25),K);
+      vector_d rho = in__.vector_lub_constrain(9.9999999999999995e-07,0.6,K);
       vector_d mu = in__.vector_constrain(K);
       vector<vector_d> alpha;
       size_t dim_alpha_0__ = K;
